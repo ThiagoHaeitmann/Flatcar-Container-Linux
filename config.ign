@@ -1,0 +1,67 @@
+{
+  "ignition": {
+    "version": "3.3.0"
+  },
+  "passwd": {
+    "users": [
+      {
+        "name": "core",
+        "sshAuthorizedKeys": [
+          "ssh-ed25519 AAAAC3NzaC1lZDI3NTE5AAAAIEYcqyGk3/+jtWv9gN2IxZnNfT3BhV3ljEueCPcxAGH4 ceo@haeicore.com.br"
+        ]
+      }
+    ]
+  },
+  "storage": {
+    "files": [
+      {
+        "path": "/etc/flatcar/update.conf",
+        "contents": {
+          "compression": "",
+          "source": "data:,GROUP%3Dstable%0AREBOOT_STRATEGY%3Doff%0A"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/etc/iptables/rules.v4",
+        "contents": {
+          "compression": "gzip",
+          "source": "data:;base64,H4sIAAAAAAAC/5SQQUvzMBzG7/kUf9hle3mDZSt2262ulRU2W5oMD+IhpplE0yYmKX43r34xmU5IwYJecnie3y95yL+jVF5YtC5uqgOFrC4ruIvW0T1aX5f1bVpng6w80BOWbjZ5Rc8hwil82ViC0oCfzn1QtMB113nL+DNgzL3zzAuo811K8+x/Tmh6tSvINs8CG02AMqkcZ0oM3vDfaRTQE5hqw6XumJqBkd1joBiQvDVjMCFbaKQVXsPUCXjppRN2hiYQXuC5AYwbo62H+Xy4krwy2366R22hd8zO0Ki7SJIff2iIJav4cgTrmz9jcbJcDSdvKa0uTgcB8/72oCTXbnTMMvrF4jheBNSm3O8Lij4CAAD//0N9Fw9eAgAA"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/etc/tailscale/authkey",
+        "contents": {
+          "compression": "",
+          "source": "data:,tskey-auth-kHLuGjxPy911CNTRL-bsBQbYFZwaM2hxLZrJvYaMNXrTZWfUic%0A"
+        },
+        "mode": 384
+      }
+    ]
+  },
+  "systemd": {
+    "units": [
+      {
+        "contents": "[Unit]\nDescription=Aplicar regras de Firewall (iptables)\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nType=oneshot\nExecStart=/usr/sbin/iptables-restore /etc/iptables/rules.v4\nRemainAfterExit=yes\n\n[Install]\nWantedBy=multi-user.target\n",
+        "enabled": true,
+        "name": "iptables-restore.service"
+      },
+      {
+        "contents": "[Unit]\nDescription=Baixar e instalar Tailscale (binários estáticos)\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/bash -euxo pipefail -c ' \\\n  mkdir -p /opt/tailscale; \\\n  curl -fsSL https://pkgs.tailscale.com/stable/tailscale_1.70.0_amd64.tgz -o /tmp/ts.tgz; \\\n  tar -xzf /tmp/ts.tgz -C /opt/tailscale --strip-components=1; \\\n  install -m 0755 /opt/tailscale/tailscaled /usr/local/sbin/tailscaled; \\\n  install -m 0755 /opt/tailscale/tailscale  /usr/local/sbin/tailscale \\\n'\n\n[Install]\nWantedBy=multi-user.target\n",
+        "enabled": true,
+        "name": "tailscale-install.service"
+      },
+      {
+        "contents": "[Unit]\nDescription=Tailscale daemon\nAfter=network-online.target tailscale-install.service\nWants=network-online.target tailscale-install.service\n\n[Service]\nExecStart=/usr/local/sbin/tailscaled\nRestart=on-failure\n\n[Install]\nWantedBy=multi-user.target\n",
+        "enabled": true,
+        "name": "tailscaled.service"
+      },
+      {
+        "contents": "[Unit]\nDescription=Tailscale up (autenticar no tailnet)\nAfter=tailscaled.service\nRequires=tailscaled.service\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/bash -euxo pipefail -c '/usr/local/sbin/tailscale up --authkey=\"$(cat /etc/tailscale/authkey)\" --ssh'\nRemainAfterExit=yes\n\n[Install]\nWantedBy=multi-user.target\n",
+        "enabled": true,
+        "name": "tailscale-up.service"
+      }
+    ]
+  }
+}
