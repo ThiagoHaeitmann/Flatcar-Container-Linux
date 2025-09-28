@@ -1,463 +1,283 @@
-variant: flatcar
-version: 1.0.0
-
-# ---------- Kernel args (SMT off) ----------
-kernel_arguments:
-  should_exist:
-    - mitigations=auto,nosmt
-    - tsx=auto
-
-passwd:
-  users:
-    - name: core
-      ssh_authorized_keys:
-        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEYcqyGk3/+jtWv9gN2IxZnNfT3BhV3ljEueCPcxAGH4 ceo@haeicore.com.br
-      password_hash: "!"
-      groups: [ sudo ]
-
-storage:
-  directories:
-    - path: /var/log/journal
-      mode: 0755
-    - path: /var/lib/nft
-      mode: 0755
-    - path: /etc/ssl/localcerts
-      mode: 0755
-    - path: /etc/systemd/resolved.conf.d
-      mode: 0755
-
-  files:
-    # ---------- SSH hardening ----------
-    - path: /etc/ssh/sshd_config.d/10-hardening.conf
-      mode: 0644
-      contents:
-        inline: |
-          PermitRootLogin no
-          PasswordAuthentication no
-          PubkeyAuthentication yes
-          AuthenticationMethods publickey
-          MaxAuthTries 3
-          MaxStartups 2:30:5
-          LoginGraceTime 30
-          PermitUserEnvironment no
-          KexAlgorithms curve25519-sha256@libssh.org,sntrup761x25519-sha512@openssh.com
-          Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com
-          MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com
-          HostKeyAlgorithms ssh-ed25519,rsa-sha2-512,rsa-sha2-256
-          AllowAgentForwarding no
-          AllowTcpForwarding no
-          X11Forwarding no
-          UseDNS no
-          LogLevel VERBOSE
-          Banner /etc/issue.net
-
-    - path: /etc/issue.net
-      mode: 0644
-      contents:
-        inline: |
-          #############################################################
-          #        ACESSO RESTRITO. TODA ATIVIDADE É MONITORADA.      #
-          #############################################################
-
-    # ---------- sysctl hardening ----------
-    - path: /etc/sysctl.d/99-hardening.conf
-      mode: 0644
-      contents:
-        inline: |
-          # Rede
-          net.ipv4.tcp_syncookies=1
-          net.ipv4.conf.all.rp_filter=1
-          net.ipv4.conf.default.rp_filter=1
-          net.ipv4.conf.all.accept_redirects=0
-          net.ipv4.conf.default.accept_redirects=0
-          net.ipv6.conf.all.accept_redirects=0
-          net.ipv6.conf.default.accept_redirects=0
-          net.ipv4.conf.all.send_redirects=0
-          net.ipv4.conf.default.send_redirects=0
-          net.ipv4.conf.all.log_martians=1
-          net.ipv4.tcp_rfc1337=1
-          # Kernel/FS
-          kernel.kptr_restrict=2
-          kernel.dmesg_restrict=1
-          kernel.unprivileged_userns_clone=0
-          kernel.kexec_load_disabled=1
-          kernel.yama.ptrace_scope=2
-          fs.protected_hardlinks=1
-          fs.protected_symlinks=1
-          fs.suid_dumpable=0
-          # Observabilidade
-          fs.inotify.max_user_watches=524288
-          fs.inotify.max_user_instances=1024
-
-    # ---------- MGMT ports list (só via tailscale) ----------
-    - path: /etc/nftables.mgmt-ports.conf
-      mode: 0644
-      contents:
-        inline: |
-          define mgmt_tcp_ports = { 22, 9090, 3000, 3100, 8080, 8000, 9000, 9323 }
-          # 22=SSH, 9090=Prometheus, 3000=Grafana, 3100=Loki, 8080=Dokploy,
-          # 8000=CrowdSec app (ajuste), 9000=Portainer, 9323=Traefik metrics
-
-    # ---------- FIREWALL: perfil ABERTO (inicial) ----------
-    - path: /etc/nftables.conf
-      mode: 0644
-      contents:
-        inline: |
-          flush ruleset
-          include "/etc/nftables.mgmt-ports.conf"
-          table inet filter {
-            chains {
-              input {
-                type filter hook input priority 0; policy drop;
-                ct state established,related accept
-                iif lo accept
-
-                ip protocol icmp icmp type echo-request limit rate 5/second accept
-                ip6 nexthdr icmpv6 accept
-
-                # SSH público PROVISÓRIO (até Tailscale subir)
-                tcp dport 22 ct state new limit rate 10/minute accept
-
-                # Gestão: somente via Tailscale (mesmo no perfil aberto)
-                iif "tailscale0" tcp dport @mgmt_tcp_ports accept
-
-                # Web público
-                tcp dport {80,443} accept
-
-                reject with icmpx type admin-prohibited
-              }
-              forward { type filter hook forward priority 0; policy drop; }
-              output  { type filter hook output  priority 0; policy accept; }
-            }
-          }
-
-    # ---------- FIREWALL: perfil FECHADO (após Tailscale) ----------
-    - path: /etc/nftables.closed.conf
-      mode: 0644
-      contents:
-        inline: |
-          flush ruleset
-          include "/etc/nftables.mgmt-ports.conf"
-          table inet filter {
-            chains {
-              input {
-                type filter hook input priority 0; policy drop;
-                ct state established,related accept
-                iif lo accept
-
-                ip protocol icmp icmp type echo-request limit rate 5/second accept
-                ip6 nexthdr icmpv6 accept
-
-                # Gestão (SSH, Prom, Grafana, Loki, Dokploy, Portainer, etc.) só via tailscale
-                iif "tailscale0" tcp dport @mgmt_tcp_ports accept
-
-                # Web público
-                tcp dport {80,443} accept
-
-                reject with icmpx type admin-prohibited
-              }
-              forward { type filter hook forward priority 0; policy drop; }
-              output  { type filter hook output  priority 0; policy accept; }
-            }
-          }
-
-    # ---------- Cópia do perfil aberto (emergência) ----------
-    - path: /etc/nftables.open.conf
-      mode: 0644
-      contents:
-        inline: |
-          flush ruleset
-          include "/etc/nftables.mgmt-ports.conf"
-          table inet filter {
-            chains {
-              input {
-                type filter hook input priority 0; policy drop;
-                ct state established,related accept
-                iif lo accept
-                ip protocol icmp icmp type echo-request limit rate 5/second accept
-                ip6 nexthdr icmpv6 accept
-                tcp dport 22 ct state new limit rate 10/minute accept
-                iif "tailscale0" tcp dport @mgmt_tcp_ports accept
-                tcp dport {80,443} accept
-                reject with icmpx type admin-prohibited
-              }
-              forward { type filter hook forward priority 0; policy drop; }
-              output  { type filter hook output  priority 0; policy accept; }
-            }
-          }
-
-    # ---------- Script: fecha SSH público quando Tailscale container estiver rodando ----------
-    - path: /usr/local/sbin/nft-close-when-tailscale.sh
-      mode: 0755
-      contents:
-        inline: |
-          #!/usr/bin/bash
-          set -euo pipefail
-          FLAG="/var/lib/nft/ssh_closed"
-          ENVFILE="/etc/tailscale-dokploy.env"
-          CONTAINER_NAME="tailscale"
-          [ -f "$ENVFILE" ] && source "$ENVFILE"
-          [ -f "$FLAG" ] && exit 0
-          command -v docker >/dev/null 2>&1 || exit 0
-          if docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null | grep -q true; then
-            cp -f /etc/nftables.closed.conf /etc/nftables.conf
-            /usr/sbin/nft -f /etc/nftables.conf
-            touch "$FLAG"
-          fi
-          exit 0
-
-    - path: /etc/tailscale-dokploy.env
-      mode: 0644
-      contents:
-        inline: |
-          CONTAINER_NAME="tailscale"
-
-    # ---------- Journald persistente ----------
-    - path: /etc/systemd/journald.conf.d/10-persistent-limited.conf
-      mode: 0644
-      contents:
-        inline: |
-          [Journal]
-          Storage=persistent
-          SystemMaxUse=250M
-          RuntimeMaxUse=100M
-          Compress=yes
-
-    # ---------- NTP / TZ (overwrite corrigido) ----------
-    - path: /etc/systemd/timesyncd.conf
-      mode: 0644
-      overwrite: true
-      contents:
-        inline: |
-          [Time]
-          NTP=a.st1.ntp.br b.st1.ntp.br
-          FallbackNTP=0.pool.ntp.org 1.pool.ntp.org
-
-    - path: /etc/timezone
-      mode: 0644
-      contents:
-        inline: America/Sao_Paulo
-
-    # ---------- DNS explícito (systemd-resolved) ----------
-    - path: /etc/systemd/resolved.conf.d/10-dns.conf
-      mode: 0644
-      contents:
-        inline: |
-          [Resolve]
-          DNS=1.1.1.1 8.8.8.8
-          FallbackDNS=9.9.9.9
-          Cache=yes
-          DNSStubListener=yes
-
-    # ---------- Docker (logs/cgroup/estabilidade) ----------
-    - path: /etc/docker/daemon.json
-      mode: 0644
-      contents:
-        inline: |
+{
+  "ignition": {
+    "version": "3.3.0"
+  },
+  "kernelArguments": {
+    "shouldExist": [
+      "mitigations=auto,nosmt",
+      "tsx=auto"
+    ]
+  },
+  "passwd": {
+    "users": [
+      {
+        "groups": [
+          "sudo"
+        ],
+        "name": "core",
+        "passwordHash": "!",
+        "sshAuthorizedKeys": [
+          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEYcqyGk3/+jtWv9gN2IxZnNfT3BhV3ljEueCPcxAGH4 ceo@haeicore.com.br"
+        ]
+      }
+    ]
+  },
+  "storage": {
+    "directories": [
+      {
+        "path": "/var/log/journal",
+        "mode": 493
+      },
+      {
+        "path": "/var/lib/nft",
+        "mode": 493
+      },
+      {
+        "path": "/etc/ssl/localcerts",
+        "mode": 493
+      },
+      {
+        "path": "/etc/systemd/resolved.conf.d",
+        "mode": 493
+      }
+    ],
+    "files": [
+      {
+        "path": "/etc/ssh/sshd_config.d/10-hardening.conf",
+        "contents": {
+          "compression": "gzip",
+          "source": "data:;base64,H4sIAAAAAAAC/1yQwW7bMAyG73oKPUDcxjLkYT3V7bINaLIVTTrsqsiEJdQWDZJO4rcv7AJt3Zv48RP5S49AXZQnRNliE5NOqB4d8xmprgYJkCR6JxHfOsPxBcYvfARWS7QDCViz7odjG/0LjGrnLpNyoAisi6nciyMZetbmpljfWDVv/0XOwyF2oIu1ekv2zECbdIqEqYMkU4oHuFRtgxQldKz9QCcw1ubfMw7O2PK2jUfmcIXUrDgJDf23Mr+8GzY3t9hDmhSPnbqPfQBi7YPzwZl11mM75sXafrZWDtjYMmt8t7i8q+5Zh875eXdmc5OBLJTVR3ca8KWrfiPLA4yf3sMcMqjnuCti9z74ozC2VFXb4rlqIMlPpLOjOqZm+puZH3y/pP/zfAmeGX782U+nLTZbOEGr/22e7v7uN+rOpQSkr0H8dWQe4CqBqNcAAAD//1sRzsQnAgAA"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/etc/issue.net",
+        "contents": {
+          "compression": "gzip",
+          "source": "data:;base64,H4sIAAAAAAAC/1KmBHApK0CBo7NrcLC/QpBrcEiQZ4i/nkKIv4ujgmOIZ5ini6OLq8LhTgVffz/PEP8gRxdHPYgeZS7KLAcEAAD//5ZcZtW7AAAA"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/etc/sysctl.d/99-hardening.conf",
+        "contents": {
+          "compression": "gzip",
+          "source": "data:;base64,H4sIAAAAAAAC/4ySQW/iMBCF7/kVSNy9SWBZLr7uZQ8rtT/AGuwJjOLY1syEkn9fBYkCamm5We+9+fQ8muXiBQNWCdVQOa6N+uJkSj7nnlBsc3V8Tp2BGA0X11FU5E9uwA7GqN8k5nnwHos6xkCMXsXWDzCPg5tnaJtnaTfdBFN4otkPsZkU894NwEqQ7tY4L5g736xWf2xTLRf/kBPGX39fq/78Mn1RdoyiTF5te5HDgLK/6s1FH1NhOlLEPQY3CnIS52NOaOsPIp7Qu5ghuEACu4jhOj/BAKYog0cnPhe0bdWJKZwVvWJwB+AQKfXzL+4MmYYbXUYKLoxDmfm2rpaL/ztBPsKOIgUIOIcoZaVuMgOczl3dG6g/oNjf7brdbr+MUBKF5OdjrNt19R4AAP//UcyRqrECAAA="
+        },
+        "mode": 420
+      },
+      {
+        "path": "/etc/nftables.mgmt-ports.conf",
+        "contents": {
+          "compression": "gzip",
+          "source": "data:;base64,H4sIAAAAAAAC/ySNMQ+CMBBGd37FJSyaMNSywHCTJjo4kOBOGji0YmlzLTHG+N8N3PLyLd97A412JnB3l7rUhy54ThEQvqB1AbWqVQGlUisPKytVbVx3LSx1Cb8sB62xbS9ywoa9o/SgJcofz2xGMxvx4NVPVmR48lN4+U+R5ZsWj+zfQ0s9mBBgZ55LTLSXGDaek7EzsWTxxoZGO4GjxLaP2T8AAP//FFj7M84AAAA="
+        },
+        "mode": 420
+      },
+      {
+        "path": "/etc/nftables.conf",
+        "contents": {
+          "compression": "gzip",
+          "source": "data:;base64,H4sIAAAAAAAC/3RSS24TQRDdzymezCaR4tiEECGyYQdZBcUIllFPTw1T0N3VdNfEsSyfgiOw4gpsfTE04xmw7GTTatXnvVevqnZtbpBaR5m04GBdWxEmM1I7C7Wa0lE+91+9TqMkzedWQj0p+jg4kKJmp5SwLgDbGA65/wIcYqvDH9BVpLG0Efk+pGNiSawrzK8RxbFdoUoSr4cuq8hqlEC5Y+TcUHWWyBmlCsZaijpUMtdwMsbGYERMomLFga2Pu6eXQraRaaIfLWWFY8+K1BG9nmWyEg7R4xUCPWpTpR7j4eqA6QUWiw+I2z+lYyv4eHf7+Wax/Xl3c4sTo9vf+GTYZWscIbclp9PRFhtRdcbi4uL/tIGW+5pezmeeQ6t0RPqesm5/yVtk8RSU8MBmj+rEU/aCIIiUanYwJSWV0z3PJjpWzyd7at51G79XG+/7rR8Rf6Hy37RHo6zfzM8uL19tDroSfSOrWLI2vYmPu02YynOYxiQNl6xU9dWb/q0lLU2qsD4+nzH13AENCNJqd2ZPIYypJxB2uncYm2JT/A0AAP//E7E34yQDAAA="
+        },
+        "mode": 420
+      },
+      {
+        "path": "/etc/nftables.closed.conf",
+        "contents": {
+          "compression": "gzip",
+          "source": "data:;base64,H4sIAAAAAAAC/3RSsW7bQAzd9RUP7tICim2gaVAgS4cC6dAhQIaOwfmOqlifjlcelcQw/DX9hG5d/WOFZCkonHQhiEfy8fHeNbEvLbSPVMgqTj72gbBYkflVasxtIpVl972ziyxqZeklNYtqxMGJDA1HI8W+AnzrOJUxBTjl3qYcsF2mubUV2U7lrCzKtsP6Glki+x2CSr6epryhmDMClWEjl5ZCrRSdUYDznrJNncwNoszYDGZkFRMvEey7fAqjFPKtXCj97KkYInds0GHRh1UhL+mcPV8h0ZO1QUeOh6uzTW9wQ8WOvwRv7+6+1LhV6WrcqGtccjW+ypZrfJZtjrKrcStqjhNpDTK/fIdy/I0HdjDHsXgX6Z+rFs/gegHzGWEwAp8GT+7N5/vRlxd6vtEG+fhnE9nL7MHz8P7jur68fH84m1L6Qd7wyNaOZz6d3sqFjtNFVml5w0Zh7D6MsRF9dBqwf2nwXPqfxROD9DZ8hNcY5tIrDCfdJ45Ddaj+BgAA//89YaP5xgIAAA=="
+        },
+        "mode": 420
+      },
+      {
+        "path": "/etc/nftables.open.conf",
+        "contents": {
+          "compression": "gzip",
+          "source": "data:;base64,H4sIAAAAAAAC/3SR367aMAzG7/sUVq8Ppx1jaBI3exMUHHfxlsZZ4g4Q6rtPTYvG3xvL8uf8/MXu/JAdpMFTJq04oB8sQd2QYhM6NQdP+bP/2esqStL8iRK6uip14EAKHXulBJcKAJ3hkEsKwCEOuuQAeo50bXUivxc5JpbEeoZ2B1E84xlskrhbXqFCVqMElKeJnB3Zj0TeKFkwiBR16WTuwMtDLUJMooLigbGPcyhOCJ2sEv0ZKCt47lkhTXO+NZlQwiM8biHQSZ1NhfF3e68rRrDTemC9/u850PEW/aVteg6D0rPxWg37jMZTW9/Afkxr3yvGfVn9u5mX7+3HZvN1vNcT/SJUOLK64vk0f9zYnsMqJnF8YCVbuscSO0lHkyxcno91ld6dayHIoNNRXxGu0gvCbHtmjNVY/QsAAP//PV6J15ICAAA="
+        },
+        "mode": 420
+      },
+      {
+        "path": "/usr/local/sbin/nft-close-when-tailscale.sh",
+        "contents": {
+          "compression": "gzip",
+          "source": "data:;base64,H4sIAAAAAAAC/2yQUWvqMBSA3/Mrzs0VfWpzr69DQUYdguvAjb2MIWl6YoPxpGuSsqH+91G1w7G9Jt/5OOf7+0dE34jCkCikr5jHAAlGB7WpUUtj2Xw5u5tw0cpGWFMI0kF4X62VdR5LzrL8eb5YZhMuMCgRpLFeSYtJ6ba1dR8pUsvZ7UP+NFvk2Wqdz+6zCf/COHuBRAMfXDQcXmE4BO9io/Dquce6ZS4MvpsA/5hyu52kEpIWSqe22MBUlNgKitbCeDr8D4dDzxrdM4Z8jSp00tF+nz4GGTBdRSJDm+NxBHzwfWUO4yvtATYN1pC8QWgi3kCokBiAqjvfqQPpIAuLPj1nSpWjHz+ONAM45fddf9Lhl/kzFVxUVX8/04ZdLvoMAAD//xmk2Y+/AQAA"
+        },
+        "mode": 493
+      },
+      {
+        "path": "/etc/tailscale-dokploy.env",
+        "contents": {
+          "compression": "",
+          "source": "data:,CONTAINER_NAME%3D%22tailscale%22%0A"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/etc/systemd/journald.conf.d/10-persistent-limited.conf",
+        "contents": {
+          "compression": "",
+          "source": "data:,%5BJournal%5D%0AStorage%3Dpersistent%0ASystemMaxUse%3D250M%0ARuntimeMaxUse%3D100M%0ACompress%3Dyes%0A"
+        },
+        "mode": 420
+      },
+      {
+        "overwrite": true,
+        "path": "/etc/systemd/timesyncd.conf",
+        "contents": {
+          "compression": "",
+          "source": "data:,%5BTime%5D%0ANTP%3Da.st1.ntp.br%20b.st1.ntp.br%0AFallbackNTP%3D0.pool.ntp.org%201.pool.ntp.org%0A"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/etc/timezone",
+        "contents": {
+          "compression": "",
+          "source": "data:,America%2FSao_Paulo"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/etc/systemd/resolved.conf.d/10-dns.conf",
+        "contents": {
+          "compression": "",
+          "source": "data:,%5BResolve%5D%0ADNS%3D1.1.1.1%208.8.8.8%0AFallbackDNS%3D9.9.9.9%0ACache%3Dyes%0ADNSStubListener%3Dyes%0A"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/etc/docker/daemon.json",
+        "contents": {
+          "compression": "gzip",
+          "source": "data:;base64,H4sIAAAAAAAC/zTNMQ6CUBAE0J5TbLbmGy1sSDyJsUAYyRrgk92FoIS7G/jSzrzJLBkRt7EJtcoE5YL4bbEPL2nB+VHGwY0LWoi7cg4mX2zwcu44T9HOC+Ir07qvMKM6ZnfuS5cJp6rROA7p6WYfc3Q1P3Yvg5fPFht3HZGeZUJQmEfFP8/W7BcAAP//ON+24rIAAAA="
+        },
+        "mode": 420
+      },
+      {
+        "path": "/etc/systemd/system/docker.service.d/10-limits.conf",
+        "contents": {
+          "compression": "",
+          "source": "data:,%5BService%5D%0ALimitNOFILE%3D1048576%0A"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/etc/locksmith/config.json",
+        "contents": {
+          "compression": "gzip",
+          "source": "data:;base64,H4sIAAAAAAAC/6rmUlBQKkpNys8viS8uKUosSU2vVLKCCSnpIEmXZ+al5JfHF5ckFpWAlBgYWxkYYFORk5qXXpIBUmKUocRVywUIAAD//9Ud77JkAAAA"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/etc/audit/rules.d/99-base.rules",
+        "contents": {
+          "compression": "gzip",
+          "source": "data:;base64,H4sIAAAAAAAC/3zMTQoDIQxA4f2cIhcYAr1QCcbRMMGI0UpvX1roDxRcvN3H2ydg7AEruU+GvcIk2E8QjqVLv29v4JnY5gKkZqOuBoMtNl8Jz8/4Gqwckr7SPb/QjRqqJVTyrvYD1JIU/5g2Ch4kqhZO/FcRLtsjAAD//wj/Ftn4AAAA"
+        },
+        "mode": 416
+      },
+      {
+        "path": "/usr/local/sbin/gen-internal-cert.sh",
+        "contents": {
+          "compression": "gzip",
+          "source": "data:;base64,H4sIAAAAAAAC/4SQQU86MRDF7/0U8+/fcLLbBQMEkh50JZFggAAeiHoYyiCVbndtuwrf3qxsSDx5eYeX997kN///ySp4uTFObjDsWaAIgqoCSlPSDo1l2WKluKSoZQhW2kKj1eRjkMZF8g5ton3kbDJa/xE70ImzZxA74FfZYsXhFVotaIzJaN0YdDQRUlaU5EKwQLpEjzkIhzlB6U1OnW7vsw3ijdyBTiBcUVQRRC3nnUvX0weIYzcdgHD0BaKON6fEFk8BbgZ9EGGPnW4PXhiACNXmHbjM1N1CLldqOZePtczUA5LRhSc5e1Jjt/Mos6m6oP3g8vMEbrd0jMDrKdLx1sYp5qTup8vh7/z1eD5sd/pJmqRJuymfIervsO8AAAD///3HurOaAQAA"
+        },
+        "mode": 493
+      },
+      {
+        "path": "/etc/systemd/system/swapfile-create.service",
+        "contents": {
+          "compression": "gzip",
+          "source": "data:;base64,H4sIAAAAAAAC/1SOsU7DQBBE+/uKpUkq49DQXQFxhOiQAqKwXKzPe3jFec+6XUPy98iFQZTz9DQz7Zuwda4hDYVn4yz+WAiNQL9xjpwIOAL2SmLumGXg1XlBG08XVlN/U2+iayjikqyhmWQgCUzqJbuHaFR8ygFTFfXWsHyQufZM5YsDde71OpPPQjpmc6cLhbNhMV8vWuqepe5RR6gC7COmtcUIqgR3T/C7DLsdhHHKA9wfDv/x9LmmP7Z37bOoYUqde0cxGh6vflqScbUole3dTwAAAP//dOBZNBcBAAA="
+        },
+        "mode": 420
+      },
+      {
+        "path": "/etc/systemd/system/swapfile.swap",
+        "contents": {
+          "compression": "gzip",
+          "source": "data:;base64,H4sIAAAAAAAC/3TMMa7CQAxF0d6r+BtI/gqmCKKhBaEUUQpreAFLwxDsl0Tsngo62nulM5yrcZQ9IrvNtEdNXaatSvzFpvNkBXLEczFHpE9pskOJNuCrZUg3Ef7zDqdN51H6mzL9f9HhUINayii9VuKye6X7UmjNEvCW6ldQ3gEAAP//nTPw2Z8AAAA="
+        },
+        "mode": 420
+      }
+    ]
+  },
+  "systemd": {
+    "units": [
+      {
+        "contents": "[Unit]\nDescription=Disable SMT at runtime on first boot (fallback)\nConditionPathExists=!/var/lib/smt_fallback_done\nAfter=multi-user.target\n[Service]\nType=oneshot\nExecStart=/usr/bin/bash -c 'test -e /sys/devices/system/cpu/smt/control \u0026\u0026 echo off \u003e /sys/devices/system/cpu/smt/control || true; touch /var/lib/smt_fallback_done'\n[Install]\nWantedBy=multi-user.target\n",
+        "enabled": true,
+        "name": "smt-fallback-firstboot.service"
+      },
+      {
+        "contents": "[Unit]\nDescription=Set system timezone from /etc/timezone\nBefore=sshd.service\n[Service]\nType=oneshot\nExecStart=/usr/bin/timedatectl set-timezone $(cat /etc/timezone)\n[Install]\nWantedBy=multi-user.target\n",
+        "enabled": true,
+        "name": "set-timezone.service"
+      },
+      {
+        "enabled": true,
+        "name": "systemd-resolved.service"
+      },
+      {
+        "contents": "[Unit]\nDescription=Apply nftables rules (Flatcar)\nAfter=network-online.target\nWants=network-online.target\n[Service]\nType=oneshot\nExecStart=/usr/sbin/nft -f /etc/nftables.conf\nRemainAfterExit=yes\n[Install]\nWantedBy=multi-user.target\n",
+        "enabled": true,
+        "name": "nft-apply.service"
+      },
+      {
+        "dropins": [
           {
-            "log-driver": "json-file",
-            "log-opts": { "max-size": "10m", "max-file": "5" },
-            "exec-opts": ["native.cgroupdriver=systemd"],
-            "iptables": true,
-            "live-restore": true
+            "contents": "[Unit]\nAfter=nft-apply.service\nWants=nft-apply.service\n",
+            "name": "10-firewall-order.conf"
           }
-
-    - path: /etc/systemd/system/docker.service.d/10-limits.conf
-      mode: 0644
-      contents:
-        inline: |
-          [Service]
-          LimitNOFILE=1048576
-
-    # ---------- Locksmith (janela de updates) ----------
-    - path: /etc/locksmith/config.json
-      mode: 0644
-      contents:
-        inline: |
-          {
-            "reboot_strategy": "reboot",
-            "reboot_window_start": "03:00",
-            "reboot_window_length": "2h"
-          }
-
-    # ---------- Audit rules (aplica se auditctl existir) ----------
-    - path: /etc/audit/rules.d/99-base.rules
-      mode: 0640
-      contents:
-        inline: |
-          -w /etc/passwd -p wa -k identity
-          -w /etc/shadow -p wa -k identity
-          -w /etc/group -p wa -k identity
-          -w /etc/sudoers -p wa -k identity
-          -w /etc/ssh/sshd_config -p wa -k ssh
-          -w /var/log/lastlog -p wa -k logins
-          -w /var/run/faillock/ -p wa -k logins
-          -e 2
-
-    # ---------- Cert interno autoassinado (EC P-256) ----------
-    - path: /usr/local/sbin/gen-internal-cert.sh
-      mode: 0755
-      contents:
-        inline: |
-          #!/usr/bin/bash
-          set -euo pipefail
-          CRT="/etc/ssl/localcerts/internal.crt"
-          KEY="/etc/ssl/localcerts/internal.key"
-          [ -f "$CRT" ] && [ -f "$KEY" ] && exit 0
-          openssl ecparam -name prime256v1 -genkey -noout -out "$KEY"
-          openssl req -x509 -new -key "$KEY" -days 397 -sha256 \
-            -subj "/C=BR/ST=SP/L=SP/O=Haeicore/OU=Infra/CN=internal.local" \
-            -addext "subjectAltName=DNS:internal.local,IP:127.0.0.1" \
-            -out "$CRT"
-
-    # ---------- Swapfile (1GiB) ----------
-    - path: /etc/systemd/system/swapfile-create.service
-      mode: 0644
-      contents:
-        inline: |
-          [Unit]
-          Description=Create swapfile if absent
-          ConditionPathExists=!/swapfile
-          DefaultDependencies=no
-          After=local-fs.target
-          [Service]
-          Type=oneshot
-          ExecStart=/usr/bin/bash -c 'fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile'
-          [Install]
-          WantedBy=multi-user.target
-
-    - path: /etc/systemd/system/swapfile.swap
-      mode: 0644
-      contents:
-        inline: |
-          [Unit]
-          Description=Activate swapfile
-          Requires=swapfile-create.service
-          After=swapfile-create.service
-          [Swap]
-          What=/swapfile
-          [Install]
-          WantedBy=multi-user.target
-
-systemd:
-  units:
-    # ---------- SMT fallback no 1º boot ----------
-    - name: smt-fallback-firstboot.service
-      enabled: true
-      contents: |
-        [Unit]
-        Description=Disable SMT at runtime on first boot (fallback)
-        ConditionPathExists=!/var/lib/smt_fallback_done
-        After=multi-user.target
-        [Service]
-        Type=oneshot
-        ExecStart=/usr/bin/bash -c 'test -e /sys/devices/system/cpu/smt/control && echo off > /sys/devices/system/cpu/smt/control || true; touch /var/lib/smt_fallback_done'
-        [Install]
-        WantedBy=multi-user.target
-
-    # ---------- Timezone antes do sshd ----------
-    - name: set-timezone.service
-      enabled: true
-      contents: |
-        [Unit]
-        Description=Set system timezone from /etc/timezone
-        Before=sshd.service
-        [Service]
-        Type=oneshot
-        ExecStart=/usr/bin/timedatectl set-timezone $(cat /etc/timezone)
-        [Install]
-        WantedBy=multi-user.target
-
-    # ---------- Resolver ----------
-    - name: systemd-resolved.service
-      enabled: true
-
-    # ---------- Firewall no boot ----------
-    - name: nft-apply.service
-      enabled: true
-      contents: |
-        [Unit]
-        Description=Apply nftables rules (Flatcar)
-        After=network-online.target
-        Wants=network-online.target
-        [Service]
-        Type=oneshot
-        ExecStart=/usr/sbin/nft -f /etc/nftables.conf
-        RemainAfterExit=yes
-        [Install]
-        WantedBy=multi-user.target
-
-    # ---------- sshd só depois do firewall ----------
-    - name: sshd.service
-      dropins:
-        - name: 10-firewall-order.conf
-          contents: |
-            [Unit]
-            After=nft-apply.service
-            Wants=nft-apply.service
-
-    # ---------- Docker ----------
-    - name: docker.service
-      enabled: true
-    - name: docker.socket
-      enabled: true
-
-    # ---------- Fechar 22 público quando Tailscale rodar ----------
-    - name: nft-close-ssh.service
-      contents: |
-        [Unit]
-        Description=Switch nftables to CLOSED profile when Tailscale container is up
-        [Service]
-        Type=oneshot
-        ExecStart=/usr/local/sbin/nft-close-when-tailscale.sh
-
-    - name: nft-close-ssh.timer
-      enabled: true
-      contents: |
-        [Unit]
-        Description=Timer to close public SSH when Tailscale is running
-        [Timer]
-        OnBootSec=45s
-        OnUnitInactiveSec=2m
-        AccuracySec=30s
-        Unit=nft-close-ssh.service
-        [Install]
-        WantedBy=timers.target
-
-    # ---------- Updates ----------
-    - name: update-engine.service
-      enabled: true
-    - name: locksmithd.service
-      enabled: true
-
-    # ---------- Audit rules apply se auditctl existir ----------
-    - name: audit-rules-apply.service
-      enabled: true
-      contents: |
-        [Unit]
-        Description=Apply Linux audit rules if auditctl exists
-        After=multi-user.target
-        [Service]
-        Type=oneshot
-        ExecStart=/usr/bin/bash -c 'command -v auditctl >/dev/null 2>&1 && auditctl -R /etc/audit/rules.d/99-base.rules || true'
-        [Install]
-        WantedBy=multi-user.target
-
-    # ---------- Cert interno (1x) ----------
-    - name: gen-internal-cert.service
-      enabled: true
-      contents: |
-        [Unit]
-        Description=Generate internal self-signed certificate (one-shot)
-        After=network-online.target
-        [Service]
-        Type=oneshot
-        ExecStart=/usr/local/sbin/gen-internal-cert.sh
-        [Install]
-        WantedBy=multi-user.target
-
-    # ---------- Swap ----------
-    - name: swapfile-create.service
-      enabled: true
-    - name: swapfile.swap
-      enabled: true
+        ],
+        "name": "sshd.service"
+      },
+      {
+        "enabled": true,
+        "name": "docker.service"
+      },
+      {
+        "enabled": true,
+        "name": "docker.socket"
+      },
+      {
+        "contents": "[Unit]\nDescription=Switch nftables to CLOSED profile when Tailscale container is up\n[Service]\nType=oneshot\nExecStart=/usr/local/sbin/nft-close-when-tailscale.sh\n",
+        "name": "nft-close-ssh.service"
+      },
+      {
+        "contents": "[Unit]\nDescription=Timer to close public SSH when Tailscale is running\n[Timer]\nOnBootSec=45s\nOnUnitInactiveSec=2m\nAccuracySec=30s\nUnit=nft-close-ssh.service\n[Install]\nWantedBy=timers.target\n",
+        "enabled": true,
+        "name": "nft-close-ssh.timer"
+      },
+      {
+        "enabled": true,
+        "name": "update-engine.service"
+      },
+      {
+        "enabled": true,
+        "name": "locksmithd.service"
+      },
+      {
+        "contents": "[Unit]\nDescription=Apply Linux audit rules if auditctl exists\nAfter=multi-user.target\n[Service]\nType=oneshot\nExecStart=/usr/bin/bash -c 'command -v auditctl \u003e/dev/null 2\u003e\u00261 \u0026\u0026 auditctl -R /etc/audit/rules.d/99-base.rules || true'\n[Install]\nWantedBy=multi-user.target\n",
+        "enabled": true,
+        "name": "audit-rules-apply.service"
+      },
+      {
+        "contents": "[Unit]\nDescription=Generate internal self-signed certificate (one-shot)\nAfter=network-online.target\n[Service]\nType=oneshot\nExecStart=/usr/local/sbin/gen-internal-cert.sh\n[Install]\nWantedBy=multi-user.target\n",
+        "enabled": true,
+        "name": "gen-internal-cert.service"
+      },
+      {
+        "enabled": true,
+        "name": "swapfile-create.service"
+      },
+      {
+        "enabled": true,
+        "name": "swapfile.swap"
+      }
+    ]
+  }
+}
