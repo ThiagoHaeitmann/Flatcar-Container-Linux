@@ -17,7 +17,7 @@
         "name": "core",
         "passwordHash": "!",
         "sshAuthorizedKeys": [
-          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEYcqyGk3/+jtWv9gN2IxZnNfT3BhV3ljEueCPcxAGH4 ceo@haeicore.com.br"
+          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKGwL0d8tr2Ih4GUTXaJRoQXFxXoMlsNtB1yZv52Q7oi ceo@haeicore.com.br"
         ]
       }
     ]
@@ -38,6 +38,10 @@
       },
       {
         "path": "/etc/systemd/resolved.conf.d",
+        "mode": 493
+      },
+      {
+        "path": "/etc/local-scripts",
         "mode": 493
       }
     ],
@@ -62,7 +66,7 @@
         "path": "/etc/sysctl.d/99-hardening.conf",
         "contents": {
           "compression": "gzip",
-          "source": "data:;base64,H4sIAAAAAAAC/4ySQW/iMBCF7/kVSNy9SWBZLr7uZQ8rtT/AGuwJjOLY1syEkn9fBYkCamm5We+9+fQ8muXiBQNWCdVQOa6N+uJkSj7nnlBsc3V8Tp2BGA0X11FU5E9uwA7GqN8k5nnwHos6xkCMXsXWDzCPg5tnaJtnaTfdBFN4otkPsZkU894NwEqQ7tY4L5g736xWf2xTLRf/kBPGX39fq/78Mn1RdoyiTF5te5HDgLK/6s1FH1NhOlLEPQY3CnIS52NOaOsPIp7Qu5ghuEACu4jhOj/BAKYog0cnPhe0bdWJKZwVvWJwB+AQKfXzL+4MmYYbXUYKLoxDmfm2rpaL/ztBPsKOIgUIOIcoZaVuMgOczl3dG6g/oNjf7brdbr+MUBKF5OdjrNt19R4AAP//UcyRqrECAAA="
+          "source": "data:;base64,H4sIAAAAAAAC/4ySTW7rMAyE9z6M4Dh5ednoLAJL0QlhWRJIOo1vX6hA84M2bbYznz4MCGUyx/W8c4Y16JqxlIlJ/aa7Nljy6CAlJzWMnIzkWxtphCXZL0R7D4hULQhFFkJT3z/RPAf3r9j2r9rutinl+MKyP7BmSuUYZhBjyA9nbAeWETfb7X+/6SaSTMlN1SQIqQmj+eErjjPp8ZZf8SVX4TMnOlIMi5JkDZhKJt9fjXQhDKlADJEV3hLF2/sVZnDVBJCCYqnkh25UV6UYoVEMJ5CYOE9t+UOh63yX68IxxGWuze/7FnEuxuPqZrh8LgvvYHgi9f+G3XA4/IhwVoOM7bv1w677CAAA//8Pna7VjAIAAA=="
         },
         "mode": 420
       },
@@ -70,7 +74,7 @@
         "path": "/etc/nftables.mgmt-ports.conf",
         "contents": {
           "compression": "gzip",
-          "source": "data:;base64,H4sIAAAAAAAC/ySNMQ+CMBBGd37FJSyaMNSywHCTJjo4kOBOGji0YmlzLTHG+N8N3PLyLd97A412JnB3l7rUhy54ThEQvqB1AbWqVQGlUisPKytVbVx3LSx1Cb8sB62xbS9ywoa9o/SgJcofz2xGMxvx4NVPVmR48lN4+U+R5ZsWj+zfQ0s9mBBgZ55LTLSXGDaek7EzsWTxxoZGO4GjxLaP2T8AAP//FFj7M84AAAA="
+          "source": "data:;base64,H4sIAAAAAAAC/ySNMYuDQBBGe3/FgM0dWOytjRZTXSApUgiml0XHZGPWldmREEL+e9BpHl/zvTfQ6GeCcA3SSb90S2RJgPAGawuoTW0KKI3Z+LexMtXObdfK0pbwyXKwFtv2pCdsOAaSG61J/3hkN7rZqQfPcfIqw0Oclkd8FVm+a/Gf43NoqYcfd1+T0K+GsIkszs/EmsQLOxr9BIGEfZ+ybwAAAP//fPxWacoAAAA="
         },
         "mode": 420
       },
@@ -78,7 +82,7 @@
         "path": "/etc/nftables.conf",
         "contents": {
           "compression": "gzip",
-          "source": "data:;base64,H4sIAAAAAAAC/3RSS24TQRDdzymezCaR4tiEECGyYQdZBcUIllFPTw1T0N3VdNfEsSyfgiOw4gpsfTE04xmw7GTTatXnvVevqnZtbpBaR5m04GBdWxEmM1I7C7Wa0lE+91+9TqMkzedWQj0p+jg4kKJmp5SwLgDbGA65/wIcYqvDH9BVpLG0Efk+pGNiSawrzK8RxbFdoUoSr4cuq8hqlEC5Y+TcUHWWyBmlCsZaijpUMtdwMsbGYERMomLFga2Pu6eXQraRaaIfLWWFY8+K1BG9nmWyEg7R4xUCPWpTpR7j4eqA6QUWiw+I2z+lYyv4eHf7+Wax/Xl3c4sTo9vf+GTYZWscIbclp9PRFhtRdcbi4uL/tIGW+5pezmeeQ6t0RPqesm5/yVtk8RSU8MBmj+rEU/aCIIiUanYwJSWV0z3PJjpWzyd7at51G79XG+/7rR8Rf6Hy37RHo6zfzM8uL19tDroSfSOrWLI2vYmPu02YynOYxiQNl6xU9dWb/q0lLU2qsD4+nzH13AENCNJqd2ZPIYypJxB2uncYm2JT/A0AAP//E7E34yQDAAA="
+          "source": "data:;base64,H4sIAAAAAAAC/5RTwW7TQBC9+yueDIdUtE0oVYXoB8C9SByr9XocD13vrHbHcaIoX9MTZ25c82PIdtwmAQ745J03s/N23pvKtalGbB0l0oy9dW1JyOekdu4rNYWjdN0sG70KEjVdW/FVnmUDAPakqNgpRWwzwNaGPdiHVoczoJtAU0Yt8nQAQ2SJrBss7hHEsd2gjBLuhxqrSGqUQKlvw6mm8jKSM0oljLUUdMhjruBkioyhgBBFxYoD2yacpIc7eFprXcYBW92dlL7Bw8MXhP2vwrGV/poVp/3PyIKZ0f0PfDXskjWOkNqC48X4PhtQ9pPBzc0rcU8dHDesiP3x/WLesG+Vzhp+pqT7Z/mEJA15JazYHLWZsVeKlbGEICXB758FtOakHOEFhYheTJPwpiHkOhUv8iNqb3v9HtWGx0HDMxbfqHh59tmbth8Xl7e3H3YnFZG+k1V0rPUwx/Uosikb9lchSs0FK5UZsBsLXr/RH5XEzsTyXw6Z4COPHJga56Q7dsV8ckWkFMQnSv9loOlGK14Ne4oJKohkbA2te3srxd7is1LsE0UUkcslwfgSqTOxOQRORdgiH9MX+eX0+7jsxtQ+VMSrdzl2p0xmEpTFG3dxICUris5s4Ek7iU8JXKFNw1yPBF+tnfHX1vTi5ac39gsFWlHcaM1+CXKJBuhs4XYviyut9suJ7Z+iTNBfFndseo9dtst+BwAA///v0/SDTgQAAA=="
         },
         "mode": 420
       },
@@ -86,7 +90,7 @@
         "path": "/etc/nftables.closed.conf",
         "contents": {
           "compression": "gzip",
-          "source": "data:;base64,H4sIAAAAAAAC/3RSsW7bQAzd9RUP7tICim2gaVAgS4cC6dAhQIaOwfmOqlifjlcelcQw/DX9hG5d/WOFZCkonHQhiEfy8fHeNbEvLbSPVMgqTj72gbBYkflVasxtIpVl972ziyxqZeklNYtqxMGJDA1HI8W+AnzrOJUxBTjl3qYcsF2mubUV2U7lrCzKtsP6Glki+x2CSr6epryhmDMClWEjl5ZCrRSdUYDznrJNncwNoszYDGZkFRMvEey7fAqjFPKtXCj97KkYInds0GHRh1UhL+mcPV8h0ZO1QUeOh6uzTW9wQ8WOvwRv7+6+1LhV6WrcqGtccjW+ypZrfJZtjrKrcStqjhNpDTK/fIdy/I0HdjDHsXgX6Z+rFs/gegHzGWEwAp8GT+7N5/vRlxd6vtEG+fhnE9nL7MHz8P7jur68fH84m1L6Qd7wyNaOZz6d3sqFjtNFVml5w0Zh7D6MsRF9dBqwf2nwXPqfxROD9DZ8hNcY5tIrDCfdJ45Ddaj+BgAA//89YaP5xgIAAA=="
+          "source": "data:;base64,H4sIAAAAAAAC/5STz27TQBDG736KT4ZDK9o6ElWF1CtSOXCoVCSO1WY9joesd1azk6RRlKfhEbhx7Ysh23FJChzwyZ4/u+Pv900TVrmFrgJlsoKjD6uaUFZkvoqNuXmgfNUtOrtMopavvMSmLIohAY5kaDgYKXYF4FvHERzTyoZvwLaJpopWZHlIJmVRti1mt0gS2G9Rq6TboccbsjkjUO6v4dxSfaEUnFEN5z0lG+qYGwSZImMoIamYeAlg36WT8nSDSE/W1jrk1jcnrW9wR9mevwvOHh4+VfcqXXWnrnHRVZ9lydVHWaYg2+pe1BxH0nPk5x9Ys8MXxyF7F2iaK7qOUNoUnpUwn1D3EuJtr+aj+fQ4KPpqiK80R3r+OQ/sZVTwpXH3YXZxff1+f9Kh9I28YcPWDn/1NEru6o7jZVJpec5GdQHsx4bfz0irEd04rf/Fa0ofETtM6kKQzTGjamKklJPETPm/cE4neomjvhkmUHK+hbW92Yy0N9xZLX5JirlyvSC4WCNvnHaHwPkJhB3KsXxWXkyvj4vNWNqH5nr5rsT+dJIzScYSXTg/DCVr0uC2iGQb0WUGN1jlQdcj4Oun4OKVdz288vTE3t6gNenWWo4LUMijW17Zf/+yRrKyflWw+xPKlPrLGo2X3mJf7ItfAQAA//9rPugi3AMAAA=="
         },
         "mode": 420
       },
@@ -94,15 +98,15 @@
         "path": "/etc/nftables.open.conf",
         "contents": {
           "compression": "gzip",
-          "source": "data:;base64,H4sIAAAAAAAC/3SR367aMAzG7/sUVq8Ppx1jaBI3exMUHHfxlsZZ4g4Q6rtPTYvG3xvL8uf8/MXu/JAdpMFTJq04oB8sQd2QYhM6NQdP+bP/2esqStL8iRK6uip14EAKHXulBJcKAJ3hkEsKwCEOuuQAeo50bXUivxc5JpbEeoZ2B1E84xlskrhbXqFCVqMElKeJnB3Zj0TeKFkwiBR16WTuwMtDLUJMooLigbGPcyhOCJ2sEv0ZKCt47lkhTXO+NZlQwiM8biHQSZ1NhfF3e68rRrDTemC9/u850PEW/aVteg6D0rPxWg37jMZTW9/Afkxr3yvGfVn9u5mX7+3HZvN1vNcT/SJUOLK64vk0f9zYnsMqJnF8YCVbuscSO0lHkyxcno91ld6dayHIoNNRXxGu0gvCbHtmjNVY/QsAAP//PV6J15ICAAA="
+          "source": "data:;base64,H4sIAAAAAAAC/5RTzY7bPAy8+ykIf99hF81ft4tFgTxMoEh0zEYWBYqOEwR+98Jy3Njb9tCcIs2QGs+QlW9TDdJ6TKgFBetbh1BuUe02VGqOHtOmOTW6jiyaNpZDVRZFBoACKlTkFQXuBYCtDQWgEFvNZwC9RZwYNfP5AUYhFtIb7PYQ2ZO9gROO+1xjFZIaRcA0PEOpRrcS9EbRgbEWo2YeUQWeFzcRorCyZQ9km7jEPiDgVWsnGbt8TOgo1EZwwyfC29tTQcAOPDWkIMPx627bUGgVP8kIpkEo1ZBP1njclbN2/w/mHdTGQzZwXvkk3b/vVu/v3/qFJMEfaBU60jorvo5uGtdQWEfhmo6k6AqAfix4/sYgKpbOiPtbFBM8CyMT/wPjPXdz+7eT/YIpckiY/impqaPloIYCSgJlEDS2Bq2HOVKUYZZeHNszChyF3AnBBAepM9I8Ll4Xht+hHOm7cjX9PZy6kTpcHWX9pYR+qeSFoxIH418foviC4s0NAmrHck5AFbQp+zoL93L1Jmys8WS5XHYcJhfwgnLTmsIJ0CfM0KfJ7n9tCLc6bAHcfw9lgv6wIeOje+iLvvgZAAD//9Mh+FW3AwAA"
         },
         "mode": 420
       },
       {
-        "path": "/usr/local/sbin/nft-close-when-tailscale.sh",
+        "path": "/etc/local-scripts/nft-close-when-tailscale.sh",
         "contents": {
           "compression": "gzip",
-          "source": "data:;base64,H4sIAAAAAAAC/2yQUWvqMBSA3/Mrzs0VfWpzr69DQUYdguvAjb2MIWl6YoPxpGuSsqH+91G1w7G9Jt/5OOf7+0dE34jCkCikr5jHAAlGB7WpUUtj2Xw5u5tw0cpGWFMI0kF4X62VdR5LzrL8eb5YZhMuMCgRpLFeSYtJ6ba1dR8pUsvZ7UP+NFvk2Wqdz+6zCf/COHuBRAMfXDQcXmE4BO9io/Dquce6ZS4MvpsA/5hyu52kEpIWSqe22MBUlNgKitbCeDr8D4dDzxrdM4Z8jSp00tF+nz4GGTBdRSJDm+NxBHzwfWUO4yvtATYN1pC8QWgi3kCokBiAqjvfqQPpIAuLPj1nSpWjHz+ONAM45fddf9Lhl/kzFVxUVX8/04ZdLvoMAAD//xmk2Y+/AQAA"
+          "source": "data:;base64,H4sIAAAAAAAC/2yQUWvCMBRG3/Mr7jLRpzabr0NBRh2C68CNvYwhaXpjg/Gma5Kyof734bTi2F6Tw+G75/pKRN+IwpAopK+YxwAJRge1qVFLY9l0PnkYcdHKRlhTCNJBeF8tlXUeS86y/HU6m2cjLjAoEaSxXkmLSenWtXVfKVLL2f1T/jKZ5dlimU8esxE/Y5y9QaKB904aDu/Q74N3sVF48dxhhzEnBj9NgBum3GYjqYSkhdKpNTYwFiW2gqK1MBz3b2G361ijO8aQr1GFg3Sw3abPQQZMF5HI0Gq/HwDv/Z7MYXih3cGqwRqSDwhNxDsIFRIDUPXB99OBdJCFRZ8eM6XK0Z8fR5oBnPMjtUA6/KM4gsFFVXUJmDbsdNR3AAAA//+nCCCAwgEAAA=="
         },
         "mode": 493
       },
@@ -128,14 +132,6 @@
         "contents": {
           "compression": "",
           "source": "data:,%5BTime%5D%0ANTP%3Da.st1.ntp.br%20b.st1.ntp.br%0AFallbackNTP%3D0.pool.ntp.org%201.pool.ntp.org%0A"
-        },
-        "mode": 420
-      },
-      {
-        "path": "/etc/timezone",
-        "contents": {
-          "compression": "",
-          "source": "data:,America%2FSao_Paulo"
         },
         "mode": 420
       },
@@ -180,7 +176,7 @@
         "mode": 416
       },
       {
-        "path": "/usr/local/sbin/gen-internal-cert.sh",
+        "path": "/etc/local-scripts/gen-internal-cert.sh",
         "contents": {
           "compression": "gzip",
           "source": "data:;base64,H4sIAAAAAAAC/4SQQU86MRDF7/0U8+/fcLLbBQMEkh50JZFggAAeiHoYyiCVbndtuwrf3qxsSDx5eYeX997kN///ySp4uTFObjDsWaAIgqoCSlPSDo1l2WKluKSoZQhW2kKj1eRjkMZF8g5ton3kbDJa/xE70ImzZxA74FfZYsXhFVotaIzJaN0YdDQRUlaU5EKwQLpEjzkIhzlB6U1OnW7vsw3ijdyBTiBcUVQRRC3nnUvX0weIYzcdgHD0BaKON6fEFk8BbgZ9EGGPnW4PXhiACNXmHbjM1N1CLldqOZePtczUA5LRhSc5e1Jjt/Mos6m6oP3g8vMEbrd0jMDrKdLx1sYp5qTup8vh7/z1eD5sd/pJmqRJuymfIervsO8AAAD///3HurOaAQAA"
@@ -213,7 +209,7 @@
         "name": "smt-fallback-firstboot.service"
       },
       {
-        "contents": "[Unit]\nDescription=Set system timezone from /etc/timezone\nBefore=sshd.service\n[Service]\nType=oneshot\nExecStart=/usr/bin/timedatectl set-timezone $(cat /etc/timezone)\n[Install]\nWantedBy=multi-user.target\n",
+        "contents": "[Unit]\nDescription=Set system timezone\nBefore=sshd.service\n[Service]\nType=oneshot\nExecStart=/usr/bin/timedatectl set-timezone America/Sao_Paulo\n[Install]\nWantedBy=multi-user.target\n",
         "enabled": true,
         "name": "set-timezone.service"
       },
@@ -222,7 +218,7 @@
         "name": "systemd-resolved.service"
       },
       {
-        "contents": "[Unit]\nDescription=Apply nftables rules (Flatcar)\nAfter=network-online.target\nWants=network-online.target\n[Service]\nType=oneshot\nExecStart=/usr/sbin/nft -f /etc/nftables.conf\nRemainAfterExit=yes\n[Install]\nWantedBy=multi-user.target\n",
+        "contents": "[Unit]\nDescription=Apply nftables rules (Flatcar)\nAfter=network-online.target\nWants=network-online.target\n[Service]\nType=oneshot\nExecStart=/usr/bin/env nft -f /etc/nftables.conf\nRemainAfterExit=yes\n[Install]\nWantedBy=multi-user.target\n",
         "enabled": true,
         "name": "nft-apply.service"
       },
@@ -244,7 +240,7 @@
         "name": "docker.socket"
       },
       {
-        "contents": "[Unit]\nDescription=Switch nftables to CLOSED profile when Tailscale container is up\n[Service]\nType=oneshot\nExecStart=/usr/local/sbin/nft-close-when-tailscale.sh\n",
+        "contents": "[Unit]\nDescription=Switch nftables to CLOSED profile when Tailscale container is up\n[Service]\nType=oneshot\nExecStart=/etc/local-scripts/nft-close-when-tailscale.sh\n",
         "name": "nft-close-ssh.service"
       },
       {
@@ -266,7 +262,7 @@
         "name": "audit-rules-apply.service"
       },
       {
-        "contents": "[Unit]\nDescription=Generate internal self-signed certificate (one-shot)\nAfter=network-online.target\n[Service]\nType=oneshot\nExecStart=/usr/local/sbin/gen-internal-cert.sh\n[Install]\nWantedBy=multi-user.target\n",
+        "contents": "[Unit]\nDescription=Generate internal self-signed certificate (one-shot)\nAfter=network-online.target\n[Service]\nType=oneshot\nExecStart=/etc/local-scripts/gen-internal-cert.sh\n[Install]\nWantedBy=multi-user.target\n",
         "enabled": true,
         "name": "gen-internal-cert.service"
       },
